@@ -914,9 +914,7 @@ node {
 
 - [`pwd`: Determine current directory](https://www.jenkins.io/doc/pipeline/steps/workflow-basic-steps/#pwd-determine-current-directory)
 
-- [`retry`: Retry the body up to N times](https://www.jenkins.io/doc/pipeline/steps/workflow-basic-steps/#retry-retry-the-body-up-to-n-times)
-
-- [`sleep`: Sleep](https://www.jenkins.io/doc/pipeline/steps/workflow-basic-steps/#sleep-sleep)
+- [`retry`: Retry the body up to N timess[`sleep`: Sleep](https://www.jenkins.io/doc/pipeline/steps/workflow-basic-steps/#sleep-sleep)
 
 - [`stash`: Stash some files to be used later in the build](https://www.jenkins.io/doc/pipeline/steps/workflow-basic-steps/#stash-stash-some-files-to-be-used-later-in-the-build)
 
