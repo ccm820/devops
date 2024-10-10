@@ -1486,3 +1486,10 @@ script {
 }
 ```
 
+### Get Commit ID(8-bit Hash)
+
+```shell
+git log -n 1 --pretty=format:"%h" Nginx/ | head
+git rev-parse --short HEAD
+```
+
