@@ -1468,5 +1468,21 @@ pipeline {
 
 
 
+### Get Current Helm Release Image 
 
+```groovy
+script {
+	// if only run install , require to get current imageTag
+	if(params.ACTION == "install") {
+		def releaseExists = sh(script: "helm status <release-name> || echo 'not-found'", returnStdout: true).trim()
+		if (releaseExists.contains('not-found')) {
+			echo "Release not found!"
+		} else {
+			echo "Release exists!"
+			def currentValues = sh(script: "helm get values my-release --output yaml", returnStdout: true)
+			def currentImageTag = currentValues.split('\n').find { it.contains('image.tag:') }?.split(':')?.get(1)?.trim()
+			imageTag = currentImageTag  
+		}
+}
+```
 
