@@ -22,12 +22,9 @@ def call() {
                         } catch (Exception e) {
                             echo "Failed to read JSON: ${e}"
                         }
-                        if (JsonPayload == null ) {
+                        if (JsonPayload == null || JsonPayload instanceof net.sf.json.JSONNull ) {
                             this.echo "JsonPayload is NULL"
                         } else if (JsonPayload instanceof Map) {
-                            if(JsonPayload.size() == 0) {
-                                this.echo "Json data is empty"
-                            } else {
                                 // 获取某些字段
                                 def ref = JsonPayload?.ref // 获取引用（如分支）
                                 def repository = JsonPayload?.repository?.name // 获取仓库名
@@ -37,10 +34,7 @@ def call() {
                                 echo "REPO_URL: ${repository}"
                                 echo "BRANCH_NAME: ${BRANCH_NAME}"
                             }
-                        } else {
-                            tpy = JsonPayload.getClass()
-                            echo "$tpy"
-                        }
+                        } 
                     }
                 }
             }
