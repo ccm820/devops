@@ -480,9 +480,24 @@ pipeline {
 
 
 
+> load vs libraray
+>
+> Load: Load individual scripts from workspace
+>
+> limit:  Modular, reusable code across jobs
+
 ```groovy
+// @Library annotation cannot evaluate dynamic content or variables.
+// def branchName = 'feature-branch'
+// @Library("my-shared-library@$branchName") _
+
 properties([parameters([string(name: 'LIB_VERSION', defaultValue: 'master')])])
 library "my-shared-library@${params.LIB_VERSION}"
+
+script {
+    def lib = library("my-shared-library@$branchName")
+    lib.someFunction()
+}
 ```
 
 
@@ -800,7 +815,7 @@ pipeline {
 
 ## Scripted Pipeline
 
-### Flow Control
+### Flow Control - IF
 
 *Conditional Statement* `if`*, Scripted Pipeline*
 
@@ -832,7 +847,35 @@ node {
 }
 ```
 
+### Flow Control - Return
 
+```groovy
+pipeline {
+    agent any
+    
+    stages {
+        stage('Stage 1') {
+            steps {
+                script {
+                    echo "Start of Stage 1"
+                    return // 退出当前stage，Stage 1后续代码不再执行
+                    echo "This will never print"
+                }
+            }
+        }
+        
+        stage('Stage 2') {
+            steps {
+                echo "Stage 2 is still executed"
+            }
+        }
+    }
+}
+```
+
+
+
+> `return` 不仅可以退出当前 stage，还可以退出当前的 script 块或函数，它并不会自动终止整个 Pipeline。return 的作用是将控制权交还给调用它的地方，并不会直接影响 Pipeline 其他 stage 的执行，除非你在逻辑中明确设置了对整个 Pipeline 的控制。
 
 ## Use Cases
 
@@ -882,6 +925,8 @@ node {
   > **`catchError`**: 适用于你希望 Pipeline 继续执行，即使某个步骤失败。它捕获错误，但不会终止 Pipeline。
   >
   > **`try-catch`**: 提供更灵活的错误处理机制，允许你根据需要决定是否继续或停止 Pipeline。可以捕获异常并根据情况处理，但如果使用 `error` 步骤，会终止 Pipeline。
+  >
+  > This step `catchError` is most useful when used in Declarative Pipeline or with the options to set the stage result or ignore build interruptions. Otherwise, consider using plain `try`-`catch`(-`finally`) blocks.
 
   ```groovy
   stage('Match PR ID') {
@@ -938,9 +983,24 @@ node {
     withEnv(['MYTOOL_HOME=/usr/local/mytool']) {
       sh '$MYTOOL_HOME/bin/start'
     }
+  
+  withEnv(['VAR1=Hello', 'VAR2=World']) {
+  	sh '''
+  	echo $VAR1
+  	echo $VAR2
+  	'''
+  }
+  
+  withEnv(['PATH=$PATH:~/.local/bin/']){
+      
+  }
   ```
 
-  
+  > withEnv(['PATH=$PATH:~/.local/bin/'])
+  >
+  > 添加新路径到 PATH里，值有变化，sh('printenv') 可以获得更新的值，但是执行在新添加的路径的命令时不并会如期生效，会报命令不存在
+  >
+  > `def` 定义的变量就是局部变量只在指定的block里生效，不加就是全局的
 
 - [`wrap`: General Build Wrapper](https://www.jenkins.io/doc/pipeline/steps/workflow-basic-steps/#wrap-general-build-wrapper)
 
@@ -1214,6 +1274,32 @@ library identifier: 'custom-lib@master', retriever: modernSCM(
    mvn dependency:tree 
 
 ### sidebar link
+
+```groovy
+pipeline {
+    agent any
+    
+    options {
+        sidebarLinks([
+            [displayName: 'Side Bar Example', iconFileName: '', urlName: 'http://example.com']
+        ])
+    }
+
+    stages {
+        stage('Hello') {
+            steps {
+                echo 'Hello World'
+            }
+        }
+    }
+}
+```
+
+### promoted builds
+
+
+
+
 
 ## Other Cases
 
