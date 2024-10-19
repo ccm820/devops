@@ -1,6 +1,6 @@
 
 def call() {
-    def  JsonPayload = [:]
+    def JsonPayload = [:]
     pipeline {
         agent any
         environment {
@@ -8,6 +8,7 @@ def call() {
             PAYLOAD = "${env.payload}"
             REPO_URL = ''   // 用于存储触发的仓库 URL
             BRANCH_NAME = '' // 用于存储触发的分支名称
+            CREDENTIALS_ID = 'your-credentials-id' // 这是在Jenkins凭据管理中配置的ID
         }
         stages {
             stage('Parse Webhook Payload') {
@@ -38,15 +39,31 @@ def call() {
                 }
             }
 
+            stage('Check Out') {
+                stage('Checkout Code') {
+                    steps {
+                        script {
+                            checkout([$class: 'GitSCM',
+                                      branches: [[name: BRANCH_NAME]],
+                                      userRemoteConfigs: [[
+                                                                  url: REPO_URL,
+                                                                  credentialsId: CREDENTIALS_ID // 添加凭据ID
+                                                          ]]
+                            ])
+                        }
+                    }
+                }
+            }
+
             stage('Build') {
                 steps {
                     script {
                         // 根据 payload 中的信息决定后续步骤
-                        if (ref == 'refs/heads/main') {
+                        if (BRANCH_NAME == 'main') {
                             echo "Building on the main branch..."
                             // 这里添加构建步骤
                         } else {
-                            echo "Skipping build for branch: ${ref}"
+                            echo "Skipping build for branch: ${BRANCH_NAME}"
                         }
                     }
                 }

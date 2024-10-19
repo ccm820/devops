@@ -1,4 +1,4 @@
-# Groovy
+# **Groovy**
 
 ## Keywords
 
@@ -661,3 +661,76 @@ class Example {
 
 
 
+## Cases in pipeline
+
+### return this
+
+**`return this`**：虽然没有显式定义类，但由于 Jenkins 将 `vars/mySharedLib.groovy` 视为一个对象，你可以通过 `return this` 返回当前脚本实例，并继续调用其他方法。
+
+**链式调用**：通过 `mySharedLib('Jenkins').anotherMethod()`，可以在调用 `call()` 方法之后继续调用 `anotherMethod()`，实现链式调用的效果。
+
+
+
+```groovy
+def call(String message) {
+    echo "Hello, ${message}!"
+    return this // 返回当前脚本实例，实现链式调用
+}
+
+def anotherMethod() {
+    echo "This is another method!"
+    return this // 返回当前脚本实例，支持继续链式调用
+}
+```
+
+**Jenkinsfile**：
+
+```groovy
+@Library('my-shared-library') _
+
+pipeline {
+    agent any
+    stages {
+        stage('Test') {
+            steps {
+                script {
+                    // 使用链式调用
+                    mySharedLib('Jenkins').anotherMethod()
+                }
+            }
+        }
+    }
+}
+```
+
+### load vs library
+
+**`load vs libraray`**
+
+> Load: Load individual scripts from workspace
+>
+> limit:  Modular, reusable code across jobs
+
+```groov
+// @Library annotation cannot evaluate dynamic content or variables.
+// def branchName = 'feature-branch'
+// @Library("my-shared-library@$branchName") _
+
+properties([parameters([string(name: 'LIB_VERSION', defaultValue: 'master')])])
+library "my-shared-library@${params.LIB_VERSION}"
+
+script {
+    def lib = library("my-shared-library@$branchName")
+    lib.someFunction()
+}
+```
+
+
+
+### Exception handling
+
+**`catchError`**: 适用于你希望 Pipeline 继续执行，即使某个步骤失败。它捕获错误，但不会终止 Pipeline。
+
+**`try-catch`**: 提供更灵活的错误处理机制，允许你根据需要决定是否继续或停止 Pipeline。可以捕获异常并根据情况处理，但如果使用 `error` 步骤，会终止 Pipeline。
+
+This step `catchError` is most useful when used in Declarative Pipeline or with the options to set the stage result or ignore build interruptions. Otherwise, consider using plain `try`-`catch`(-`finally`) blocks.
