@@ -1,6 +1,6 @@
 
 def call() {
-    def  JsonPayload
+    def  JsonPayload = [:]
     pipeline {
         agent any
         environment {
@@ -24,15 +24,19 @@ def call() {
                         }
                         if (JsonPayload == null ) {
                             echo "JsonPayload is empty"
-                        } else {
-                            // 获取某些字段
-                            def ref = JsonPayload.ref // 获取引用（如分支）
-                            def repository = JsonPayload.repository?.name // 获取仓库名
-                            REPO_URL = JsonPayload.repository?.clone_url
-                            BRANCH_NAME = JsonPayload.ref?.split('/')?.last()
-                            echo "Ref: ${ref}"
-                            echo "REPO_URL: ${repository}"
-                            echo "BRANCH_NAME: ${BRANCH_NAME}"
+                        } else if (JsonPayload instanceof Map) {
+                            if(JsonPayload.size() == 0) {
+                                echo "Json data is empty"
+                            } else {
+                                // 获取某些字段
+                                def ref = JsonPayload.ref // 获取引用（如分支）
+                                def repository = JsonPayload.repository?.name // 获取仓库名
+                                REPO_URL = JsonPayload.repository?.clone_url
+                                BRANCH_NAME = JsonPayload.ref?.split('/')?.last()
+                                echo "Ref: ${ref}"
+                                echo "REPO_URL: ${repository}"
+                                echo "BRANCH_NAME: ${BRANCH_NAME}"
+                            }
                         }
                     }
                 }
