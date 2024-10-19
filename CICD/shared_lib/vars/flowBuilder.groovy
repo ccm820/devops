@@ -37,6 +37,8 @@ def call() {
                                 echo "REPO_URL: ${repository}"
                                 echo "BRANCH_NAME: ${BRANCH_NAME}"
                             }
+                        } else {
+                            echo JsonPayload.getClass()
                         }
                     }
                 }
