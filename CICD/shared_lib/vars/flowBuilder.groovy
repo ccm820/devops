@@ -25,16 +25,15 @@ def call() {
                         if (JsonPayload == null || JsonPayload instanceof net.sf.json.JSONNull ) {
                             this.echo "JsonPayload is NULL"
                         } else if (JsonPayload instanceof Map) {
-                                // 获取某些字段
-                                def ref = JsonPayload?.ref // 获取引用（如分支）
-                                def repository = JsonPayload?.repository?.name // 获取仓库名
-                                REPO_URL = JsonPayload?.repository?.clone_url
-                                BRANCH_NAME = JsonPayload?.ref?.split('/')?.last()
-                                echo "Ref: ${ref}"
-                                echo "REPO_URL: ${repository}"
-                                echo "BRANCH_NAME: ${BRANCH_NAME}"
-                            }
-                        } 
+                            // 获取某些字段
+                            def ref = JsonPayload?.ref // 获取引用（如分支）
+                            def repository = JsonPayload?.repository?.name // 获取仓库名
+                            REPO_URL = JsonPayload?.repository?.clone_url
+                            BRANCH_NAME = JsonPayload?.ref?.split('/')?.last()
+                            echo "Ref: ${ref}"
+                            echo "REPO_URL: ${repository}"
+                            echo "BRANCH_NAME: ${BRANCH_NAME}"
+                        }
                     }
                 }
             }
