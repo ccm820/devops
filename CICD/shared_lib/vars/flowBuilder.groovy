@@ -1,6 +1,6 @@
 
 def call() {
-    def JsonPlayLoad 
+    def JsonPlayLoad = [:]
     pipeline {
         agent any
         environment {
@@ -17,8 +17,14 @@ def call() {
                         echo "Payload: ${PAYLOAD}"
                         BRANCH_NAME = env.GIT_BRANCH
                         // 将有效负载解析为 JSON 格式
-                        JsonPlayLoad = readJSON(text: PAYLOAD)
-
+                        try {
+                            JsonPlayLoad = readJSON(text: PAYLOAD)
+                        } catch (Exception e) {
+                            echo "Failed to read JSON: ${e}"
+                        }
+                        if (JsonPlayLoad.isEmpty) {
+                            echo ""
+                        }
                         // 获取某些字段
                         def ref = JsonPlayLoad?.ref // 获取引用（如分支）
                         def repository = JsonPlayLoad?.repository?.name // 获取仓库名
@@ -26,7 +32,7 @@ def call() {
                         BRANCH_NAME = JsonPlayLoad.?ref?.split('/').last()
                         echo "Ref: ${ref}"
                         echo "REPO_URL: ${repository}"
-                       echo "BRANCH_NAME: ${BRANCH_NAME}"
+                        echo "BRANCH_NAME: ${BRANCH_NAME}"
                     }
                 }
             }
