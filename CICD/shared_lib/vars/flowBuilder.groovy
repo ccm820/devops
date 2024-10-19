@@ -22,7 +22,7 @@ def call() {
                         } catch (Exception e) {
                             echo "Failed to read JSON: ${e}"
                         }
-                        if (JsonPayload == null || JsonPayload.size() == 0 ) {
+                        if (JsonPayload == null) {
                             echo "JsonPayload is empty"
                         } else {
                             // 获取某些字段
