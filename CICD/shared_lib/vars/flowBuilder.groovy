@@ -14,13 +14,13 @@ def call() {
                 steps {
                     script {
                         // 打印有效负载
-                        this.echo "Payload: ${PAYLOAD}"
+                        echo "Payload: ${PAYLOAD}"
                         BRANCH_NAME = env.GIT_BRANCH
                         // 将有效负载解析为 JSON 格式
                         try {
                             JsonPayload = readJSON(text: PAYLOAD)
                         } catch (Exception e) {
-                            this.echo "Failed to read JSON: ${e}"
+                            echo "Failed to read JSON: ${e}"
                         }
                         if (JsonPayload == null ) {
                             this.echo "JsonPayload is NULL"
@@ -33,9 +33,9 @@ def call() {
                                 def repository = JsonPayload?.repository?.name // 获取仓库名
                                 REPO_URL = JsonPayload?.repository?.clone_url
                                 BRANCH_NAME = JsonPayload?.ref?.split('/')?.last()
-                                this.echo "Ref: ${ref}"
-                                this.echo "REPO_URL: ${repository}"
-                                this.echo "BRANCH_NAME: ${BRANCH_NAME}"
+                                echo "Ref: ${ref}"
+                                echo "REPO_URL: ${repository}"
+                                echo "BRANCH_NAME: ${BRANCH_NAME}"
                             }
                         }
                     }
