@@ -40,17 +40,15 @@ def call() {
             }
 
             stage('Check Out') {
-                stage('Checkout Code') {
-                    steps {
-                        script {
-                            checkout([$class: 'GitSCM',
-                                      branches: [[name: BRANCH_NAME]],
-                                      userRemoteConfigs: [[
-                                                                  url: REPO_URL,
-                                                                  credentialsId: CREDENTIALS_ID // 添加凭据ID
-                                                          ]]
-                            ])
-                        }
+                steps {
+                    script {
+                        checkout([$class: 'GitSCM',
+                                  branches: [[name: BRANCH_NAME]],
+                                  userRemoteConfigs: [[
+                                                              url: REPO_URL,
+                                                              credentialsId: CREDENTIALS_ID
+                                                      ]]
+                        ])
                     }
                 }
             }
