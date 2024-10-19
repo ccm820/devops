@@ -29,7 +29,7 @@ def call() {
                             def ref = JsonPlayLoad?.ref // 获取引用（如分支）
                             def repository = JsonPlayLoad.repository?.name // 获取仓库名
                             REPO_URL = JsonPlayLoad.repository?.clone_url
-                            BRANCH_NAME = JsonPlayLoad.?ref?.split('/').last()
+                            BRANCH_NAME = JsonPlayLoad.ref?.split('/').last()
                             echo "Ref: ${ref}"
                             echo "REPO_URL: ${repository}"
                             echo "BRANCH_NAME: ${BRANCH_NAME}"
