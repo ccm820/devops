@@ -1,6 +1,6 @@
 
 def call() {
-    def JsonPayload = [:]
+    def  JsonPayload
     pipeline {
         agent any
         environment {
