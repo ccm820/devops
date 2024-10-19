@@ -14,28 +14,28 @@ def call() {
                 steps {
                     script {
                         // 打印有效负载
-                        echo "Payload: ${PAYLOAD}"
+                        this.echo "Payload: ${PAYLOAD}"
                         BRANCH_NAME = env.GIT_BRANCH
                         // 将有效负载解析为 JSON 格式
                         try {
                             JsonPayload = readJSON(text: PAYLOAD)
                         } catch (Exception e) {
-                            echo "Failed to read JSON: ${e}"
+                            this.echo "Failed to read JSON: ${e}"
                         }
                         if (JsonPayload == null ) {
-                            echo "JsonPayload is empty"
+                            this.echo "JsonPayload is NULL"
                         } else if (JsonPayload instanceof Map) {
                             if(JsonPayload.size() == 0) {
-                                echo "Json data is empty"
+                                this.echo "Json data is empty"
                             } else {
                                 // 获取某些字段
                                 def ref = JsonPayload?.ref // 获取引用（如分支）
                                 def repository = JsonPayload?.repository?.name // 获取仓库名
                                 REPO_URL = JsonPayload?.repository?.clone_url
                                 BRANCH_NAME = JsonPayload?.ref?.split('/')?.last()
-                                echo "Ref: ${ref}"
-                                echo "REPO_URL: ${repository}"
-                                echo "BRANCH_NAME: ${BRANCH_NAME}"
+                                this.echo "Ref: ${ref}"
+                                this.echo "REPO_URL: ${repository}"
+                                this.echo "BRANCH_NAME: ${BRANCH_NAME}"
                             }
                         }
                     }
