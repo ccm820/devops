@@ -38,7 +38,8 @@ def call() {
                                 echo "BRANCH_NAME: ${BRANCH_NAME}"
                             }
                         } else {
-                            echo JsonPayload.getClass()
+                            tpy = JsonPayload.getClass()
+                            echo "$tpy"
                         }
                     }
                 }
