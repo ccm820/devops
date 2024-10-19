@@ -3,6 +3,10 @@ def call() {
     def JsonPayload = [:]
     pipeline {
         agent any
+        parameters {
+            string(name: 'branch_name',defaultValue: '')
+            string(name: 'repo_url',defaultValue: '')
+        }
         environment {
             // 这里定义了一个环境变量 payload，用于保存有效负载
             PAYLOAD = "${env.payload}"
@@ -13,7 +17,9 @@ def call() {
         stages {
             stage('Parse Webhook Payload') {
                 steps {
+
                     script {
+                        sh 'printenv'
                         // 打印有效负载
                         echo "Payload: ${PAYLOAD}"
                         BRANCH_NAME = env.GIT_BRANCH
@@ -38,17 +44,26 @@ def call() {
                     }
                 }
             }
-
+            stage('Initialize') {
+                steps {
+                    echo "Init stages for environment"
+                    script {
+                        env.ACTION = "hello"
+                    }
+                }
+            }
             stage('Check Out') {
                 steps {
                     script {
-                        checkout([$class: 'GitSCM',
-                                  branches: [[name: BRANCH_NAME]],
-                                  userRemoteConfigs: [[
-                                                              url: REPO_URL,
-                                                              credentialsId: CREDENTIALS_ID
-                                                      ]]
-                        ])
+                        catchError(message: "Check out encounter error"){
+                            checkout([$class: 'GitSCM',
+                                      branches: [[name: BRANCH_NAME]],
+                                      userRemoteConfigs: [[
+                                                                  url: REPO_URL,
+                                                                  credentialsId: CREDENTIALS_ID
+                                                          ]]
+                            ])
+                        }
                     }
                 }
             }

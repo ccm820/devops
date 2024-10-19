@@ -734,3 +734,14 @@ script {
 **`try-catch`**: 提供更灵活的错误处理机制，允许你根据需要决定是否继续或停止 Pipeline。可以捕获异常并根据情况处理，但如果使用 `error` 步骤，会终止 Pipeline。
 
 This step `catchError` is most useful when used in Declarative Pipeline or with the options to set the stage result or ignore build interruptions. Otherwise, consider using plain `try`-`catch`(-`finally`) blocks.
+
+
+
+### Elvis 操作符
+
+```groovy
+jsonPayload = null
+def repoName = jsonPayload?.repository?.name ?: "unknown"
+println(repoName)  // 输出: unknown
+```
+
