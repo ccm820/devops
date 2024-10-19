@@ -6,22 +6,27 @@ def call() {
         environment {
             // 这里定义了一个环境变量 payload，用于保存有效负载
             PAYLOAD = "${env.payload}"
+            REPO_URL = ''   // 用于存储触发的仓库 URL
+            BRANCH_NAME = '' // 用于存储触发的分支名称
         }
         stages {
-            stage('Print Payload') {
+            stage('Parse Webhook Payload') {
                 steps {
                     script {
                         // 打印有效负载
                         echo "Payload: ${PAYLOAD}"
-
+                        BRANCH_NAME = env.GIT_BRANCH
                         // 将有效负载解析为 JSON 格式
                         JsonPlayLoad = readJSON(text: PAYLOAD)
 
                         // 获取某些字段
                         def ref = JsonPlayLoad?.ref // 获取引用（如分支）
                         def repository = JsonPlayLoad?.repository?.name // 获取仓库名
+                        REPO_URL = JsonPlayLoad?.repository?.clone_url
+                        BRANCH_NAME = JsonPlayLoad.?ref?.split('/').last()
                         echo "Ref: ${ref}"
-                        echo "Repository: ${repository}"
+                        echo "REPO_URL: ${repository}"
+                       echo "BRANCH_NAME: ${BRANCH_NAME}"
                     }
                 }
             }
