@@ -745,3 +745,26 @@ def repoName = jsonPayload?.repository?.name ?: "unknown"
 println(repoName)  // 输出: unknown
 ```
 
+
+
+### split vs tokenize
+
+```groovy
+def str = "a,,b,c"
+println str.tokenize(",")  // 输出: [a, b, c] （忽略了空值）
+println str.split(",")     // 输出: [a, , b, c] （包含空值）
+```
+
+### add (<<)
+
+`keys << path` 语法涉及向 `keys` 集合中添加 `path` 值。它使用了 Groovy 的操作符 `<<`，这是一个快捷方式，等效于调用 `add()` 方法，常用于添加元素到集合或列表中。
+
+```groovy
+def keys = []
+def path = "/some/path"
+keys << path
+println keys  // 输出: [/some/path]
+```
+
+
+
