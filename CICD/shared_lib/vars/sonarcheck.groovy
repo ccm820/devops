@@ -27,8 +27,10 @@ pipeline {
                     // def response = sh(script: "curl -s 'http://${sq_server}/api/ce/activity?component=your_project_key&status=PENDING,IN_PROGRESS'", returnStdout: true)
                     // def jsonResponse = readJSON(text: response)
                     // def taskId = jsonResponse.tasks[0].id
-
-                    def sonarOutput = sh(script: 'mvn sonar:sonar -Dsonar.projectKey=your_project_key', returnStdout: true)
+                    // def version = sh(script: 'mvn help:evaluate -Dexpression=project.version -q -DforceStdout', returnStdout: true).trim()
+                    def groupId = sh(script: "mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout", returnStdout: true).trim()
+                    def artifactId = sh(script: "mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout", returnStdout: true).trim()
+                    def sonarOutput = sh(script: "mvn sonar:sonar -Dsonar.projectKey=${groupId}:${artifactId}", returnStdout: true)
                     echo sonarOutput
 
                     // get taskId
@@ -43,7 +45,7 @@ pipeline {
                     int maxInterval = 30 // max interval 30 秒
                     int increment = 5 // increment interval 
                     waitUntil {
-                        def statusResponse = sh(script: "curl -s 'http://<sonarqube-server>/api/ce/task?id=${taskId}'", returnStdout: true)
+                        def statusResponse = sh(script: "curl -s 'http://${sq_server}/api/ce/task?id=${taskId}'", returnStdout: true)
                         def statusJson = readJSON(text: statusResponse)
                         if (statusJson.task.status == 'SUCCESS') {
                             return true // 
@@ -53,8 +55,8 @@ pipeline {
                             return false // 继续轮询
                         }
                     }
-
-                    def qgResponse = sh(script: "curl -s 'http://<sonarqube-server>/api/qualitygates/project_status?projectKey=your_project_key'", returnStdout: true)
+                 
+                    def qgResponse = sh(script: "curl -s 'http://${sq_server}/api/qualitygates/project_status?projectKey=your_project_key'", returnStdout: true)
                     def qgJson = readJSON(text: qgResponse)
                     def qgStatus = qgJson.projectStatus.status
 
