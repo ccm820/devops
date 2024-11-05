@@ -1,0 +1,17 @@
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.sonarsource.scanner.maven</groupId>
+            <artifactId>sonar-maven-plugin</artifactId>
+            <version>3.9.1.2184</version>
+            <configuration>
+                <properties>
+                    <property>
+                        <name>sonar.coverage.exclusions</name>
+                        <value>**/Test*,**/*Test.java,**/example/**</value>
+                    </property>
+                </properties>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
