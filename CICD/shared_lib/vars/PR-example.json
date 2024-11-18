@@ -1,0 +1,33 @@
+{
+    "action": "opened",
+    "pull_request": {
+      "id": 123456,
+      "number": 42,
+      "state": "open",
+      "title": "Feature XYZ",
+      "body": "This adds feature XYZ",
+      "head": {
+        "ref": "feature-branch",
+        "sha": "abc123",
+        "repo": {
+          "full_name": "owner/repo"
+        }
+      },
+      "base": {
+        "ref": "main",
+        "repo": {
+          "full_name": "owner/repo"
+        }
+      }
+    },
+    "repository": {
+      "id": 78910,
+      "name": "repo",
+      "full_name": "owner/repo"
+    },
+    "sender": {
+      "login": "user",
+      "id": 1234
+    }
+  }
+  
