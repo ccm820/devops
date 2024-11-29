@@ -1,4 +1,4 @@
-`
+```plaintext
 repo/
 ├── infra/
 │   └── helm/
@@ -12,7 +12,7 @@ repo/
 │           │   └── values.yaml
 │           └── prod/
 │               └── values.yaml
-`
+```
 
 
 
