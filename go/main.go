@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"path/filepath"
@@ -134,53 +135,76 @@ func hasRequiredLabels(staticConfigs []Static, requiredLabels map[string]string)
 	return false
 }
 
-// updateJobTargetsPreservingFieldsWithPorts updates only the IPs in the targets for a specific job
-// while preserving the original ports and labels.
+// updateJobTargetsPreservingFieldsWithPorts updates only the IPs in the targets of a specific job,
+// preserving other fields and labels, and returns true if any change was made.
 func updateJobTargetsPreservingFieldsWithPorts(config *PrometheusConfig, jobName string, newIPs []string) bool {
+	updated := false
 	for i, job := range config.ScrapeConfigs {
 		if job.JobName == jobName {
-			// If no static configs exist, create a new one
 			if len(job.StaticConfig) == 0 {
-				job.StaticConfig = []Static{{Targets: []string{}, Labels: map[string]string{}}}
+				continue
 			}
 
-			// Extract the original static config and labels
-			originalStaticConfig := job.StaticConfig[0]
-			labels := originalStaticConfig.Labels
-			originalTargets := originalStaticConfig.Targets
-
-			// Map IPs to their corresponding ports from the original targets
-			ipToPort := map[string]string{}
-			for _, target := range originalTargets {
-				// Split the target into IP and port
-				var ip, port string
-				_, err := fmt.Sscanf(target, "%s:%s", &ip, &port)
-				if err == nil {
-					ipToPort[ip] = port
-				}
+			existingTargets := job.StaticConfig[0].Targets
+			port := extractPortFromTarget(existingTargets)
+			if port == "" {
+				log.Printf("Failed to extract port for job [%s], skipping update", jobName)
+				continue
 			}
 
-			// Construct new targets with updated IPs but preserving ports
-			newTargets := []string{}
-			for _, ip := range newIPs {
-				port, exists := ipToPort[ip]
-				if !exists {
-					port = "9090" // Default port if no match found
-				}
-				newTargets = append(newTargets, fmt.Sprintf("%s:%s", ip, port))
-			}
+			// Generate new targets with the same port
+			newTargets := generateTargetsWithPort(newIPs, port)
 
-			// Update the static config with the new targets while preserving labels
-			config.ScrapeConfigs[i].StaticConfig = []Static{
-				{
-					Targets: newTargets,
-					Labels:  labels,
-				},
+			// Compare existing targets with new targets
+			if !isTargetsEqual(existingTargets, newTargets) {
+				log.Printf("Job [%s]: targets IPs changed from %s to %s", jobName,existingTargets,newTargets)
+				config.ScrapeConfigs[i].StaticConfig[0].Targets = newTargets
+				updated = true
+			} else {
+				log.Printf("Job [%s]: No IPs changed for targets %s", jobName,existingTargets)
 			}
-			return true
 		}
 	}
-	return false
+	return updated
+}
+
+// extractPortFromTarget extracts the port from an existing target (e.g., "192.168.1.1:9090").
+func extractPortFromTarget(targets []string) string {
+	if len(targets) > 0 {
+		parts := strings.Split(targets[0], ":")
+		if len(parts) == 2 {
+			return parts[1]
+		}
+	}
+	return ""
+}
+
+// generateTargetsWithPort appends a fixed port to a list of IPs to generate new targets.
+func generateTargetsWithPort(ips []string, port string) []string {
+	var targets []string
+	for _, ip := range ips {
+		targets = append(targets, fmt.Sprintf("%s:%s", ip, port))
+	}
+	return targets
+}
+
+// isTargetsEqual compares two target lists for equality.
+func isTargetsEqual(existing, new []string) bool {
+	if len(existing) != len(new) {
+		return false
+	}
+
+	existingMap := make(map[string]struct{}, len(existing))
+	for _, target := range existing {
+		existingMap[target] = struct{}{}
+	}
+
+	for _, target := range new {
+		if _, exists := existingMap[target]; !exists {
+			return false
+		}
+	}
+	return true
 }
 
 func main() {
@@ -203,7 +227,7 @@ func main() {
 
 	// Define the required labels for updating a job
 	requiredLabels := map[string]string{
-		"app": "jenkins-server", // Replace "example" with your actual label value
+		"team": "hsbclink", // Replace "example" with your actual label value
 	}
 	
 	for {
@@ -225,7 +249,8 @@ func main() {
 		}
 
 		// Update targets for jobs with required labels
-		updated := false		
+		updated := false
+		updated_jobs := 0	
 		// Update targets for each job
 		for _, job := range prometheusConfig.ScrapeConfigs {
 			if hasRequiredLabels(job.StaticConfig, requiredLabels) {
@@ -235,16 +260,19 @@ func main() {
 					log.Printf("Failed to retrieve pods: %v", err)
 					continue
 				}
-	
+	            updated_jobs = updated_jobs + 1
 				if updateJobTargetsPreservingFieldsWithPorts(&prometheusConfig, job.JobName, podIPs) {
-					log.Printf("Updated targets for job [%s] successfully", job.JobName)
+					log.Printf("Updated targets for job [%s] with IPs %s successfully", job.JobName, podIPs)
 					updated = true
 				}
 			}
 		}
-
+		if updated_jobs == 0 {
+			log.Println("No jobs met the required label criteria skipping ConfigMap update")
+			continue
+		} 
 		if !updated {
-			log.Println("No jobs met the required label criteria; skipping ConfigMap update")
+			log.Printf("No changes for %d jobs which met the required label criteria", updated_jobs)
 			time.Sleep(interval)
 			continue
 		}

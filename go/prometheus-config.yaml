@@ -28,3 +28,9 @@ data:
           - targets: ['10.1.6.238:8080']
             labels:
               app: jenkins-server
+              team: hsbclink
+      - job_name: 'jenkins-link'
+        static_configs:
+          - targets: ['10.1.6.238:8090']
+            labels:
+              app: jenkins-server
