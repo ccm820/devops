@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	"path/filepath"
+
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,7 +16,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-	"path/filepath"
 )
 
 // JobConfig holds the configuration for a Prometheus job
@@ -77,15 +78,21 @@ func getConfigMap(clientset *kubernetes.Clientset, namespace, configMapName stri
 	return configMap, nil
 }
 
-// updateConfigMap updates the specified ConfigMap in the given namespace
-func updateConfigMap(clientset *kubernetes.Clientset, namespace, configMapName string, data map[string]string) error {
-	_, err := clientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      configMapName,
-			Namespace: namespace,
-		},
-		Data: data,
-	}, metav1.UpdateOptions{})
+// updateConfigMap updates the specified ConfigMap in the given namespace, preserving non-updated fields
+func updateConfigMap(clientset *kubernetes.Clientset, namespace, configMapName string, updatedData map[string]string) error {
+	// Retrieve the existing ConfigMap
+	configMap, err := getConfigMap(clientset, namespace, configMapName)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve ConfigMap for updating: %v", err)
+	}
+
+	// Preserve original fields and update only the specified ones
+	for key, value := range updatedData {
+		configMap.Data[key] = value
+	}
+
+	// Apply the updated ConfigMap
+	_, err = clientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update ConfigMap: %v", err)
 	}
@@ -110,12 +117,65 @@ func getPodIPs(clientset *kubernetes.Clientset, namespace, labelSelector string)
 	return podIPs, nil
 }
 
-// updateJobTargets updates the targets for a specific job in the Prometheus configuration
-func updateJobTargets(config *PrometheusConfig, jobName string, newTargets []string) bool {
+// hasRequiredLabels checks if the given job's static config contains the required labels
+func hasRequiredLabels(staticConfigs []Static, requiredLabels map[string]string) bool {
+	for _, staticConfig := range staticConfigs {
+		matches := true
+		for key, value := range requiredLabels {
+			if staticConfig.Labels[key] != value {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return true
+		}
+	}
+	return false
+}
+
+// updateJobTargetsPreservingFieldsWithPorts updates only the IPs in the targets for a specific job
+// while preserving the original ports and labels.
+func updateJobTargetsPreservingFieldsWithPorts(config *PrometheusConfig, jobName string, newIPs []string) bool {
 	for i, job := range config.ScrapeConfigs {
 		if job.JobName == jobName {
+			// If no static configs exist, create a new one
+			if len(job.StaticConfig) == 0 {
+				job.StaticConfig = []Static{{Targets: []string{}, Labels: map[string]string{}}}
+			}
+
+			// Extract the original static config and labels
+			originalStaticConfig := job.StaticConfig[0]
+			labels := originalStaticConfig.Labels
+			originalTargets := originalStaticConfig.Targets
+
+			// Map IPs to their corresponding ports from the original targets
+			ipToPort := map[string]string{}
+			for _, target := range originalTargets {
+				// Split the target into IP and port
+				var ip, port string
+				_, err := fmt.Sscanf(target, "%s:%s", &ip, &port)
+				if err == nil {
+					ipToPort[ip] = port
+				}
+			}
+
+			// Construct new targets with updated IPs but preserving ports
+			newTargets := []string{}
+			for _, ip := range newIPs {
+				port, exists := ipToPort[ip]
+				if !exists {
+					port = "9090" // Default port if no match found
+				}
+				newTargets = append(newTargets, fmt.Sprintf("%s:%s", ip, port))
+			}
+
+			// Update the static config with the new targets while preserving labels
 			config.ScrapeConfigs[i].StaticConfig = []Static{
-				{Targets: newTargets},
+				{
+					Targets: newTargets,
+					Labels:  labels,
+				},
 			}
 			return true
 		}
@@ -141,7 +201,11 @@ func main() {
 		log.Fatalf("Failed to determine namespace: %v", err)
 	}
 
-	log.Printf("to retrieve ConfigMap: %s", configMapName)
+	// Define the required labels for updating a job
+	requiredLabels := map[string]string{
+		"app": "jenkins-server", // Replace "example" with your actual label value
+	}
+	
 	for {
 		// Retrieve the ConfigMap
 		configMap, err := getConfigMap(clientset, namespace, configMapName)
@@ -160,24 +224,30 @@ func main() {
 			continue
 		}
 
+		// Update targets for jobs with required labels
+		updated := false		
 		// Update targets for each job
 		for _, job := range prometheusConfig.ScrapeConfigs {
-			labelSelector := job.StaticConfig[0].Labels["app"]
-			// log.Printf("labelSelector: app=%s",labelSelector)
-			podIPs, err := getPodIPs(clientset, namespace, fmt.Sprintf("app=%s", labelSelector))
-			if err != nil {
-				log.Printf("Failed to retrieve pods: %v", err)
-				continue
-			}
-			newTargets := []string{}
-			for _, ip := range podIPs {
-				newTargets = append(newTargets, fmt.Sprintf("%s:9100", ip))
-			}
-			if updateJobTargets(&prometheusConfig, job.JobName, newTargets) {
-				log.Printf("Updated targets for job [%s] successfully", job.JobName)
+			if hasRequiredLabels(job.StaticConfig, requiredLabels) {
+				labelSelector := job.StaticConfig[0].Labels["app"]
+				podIPs, err := getPodIPs(clientset, namespace, fmt.Sprintf("app=%s", labelSelector))
+				if err != nil {
+					log.Printf("Failed to retrieve pods: %v", err)
+					continue
+				}
+	
+				if updateJobTargetsPreservingFieldsWithPorts(&prometheusConfig, job.JobName, podIPs) {
+					log.Printf("Updated targets for job [%s] successfully", job.JobName)
+					updated = true
+				}
 			}
 		}
 
+		if !updated {
+			log.Println("No jobs met the required label criteria; skipping ConfigMap update")
+			time.Sleep(interval)
+			continue
+		}
 		// Serialize updated configuration
 		newConfigData, err := yaml.Marshal(&prometheusConfig)
 		if err != nil {

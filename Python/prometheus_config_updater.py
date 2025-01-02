@@ -1,142 +1,202 @@
-from kubernetes import client, config
-import yaml
-import json
-import time
+package main
 
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"time"
 
-def get_prometheus_configmap(namespace, configmap_name):
-    """
-    获取 Prometheus 的 ConfigMap 内容。
-    """
-    config.load_kube_config()
-    v1 = client.CoreV1Api()
-    try:
-        configmap = v1.read_namespaced_config_map(configmap_name, namespace)
-        return configmap
-    except Exception as e:
-        print(f"获取 ConfigMap 失败: {e}")
-        return None
+	"gopkg.in/yaml.v3"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
+	"path/filepath"
+)
 
+// JobConfig holds the configuration for a Prometheus job
+type JobConfig struct {
+	JobName      string   `yaml:"job_name"`
+	StaticConfig []Static `yaml:"static_configs"`
+}
 
-def update_prometheus_configmap(namespace, configmap_name, new_data):
-    """
-    更新 Prometheus 的 ConfigMap 内容。
-    """
-    config.load_kube_config()
-    v1 = client.CoreV1Api()
-    try:
-        # 更新 ConfigMap 数据
-        body = client.V1ConfigMap(data=new_data)
-        v1.patch_namespaced_config_map(configmap_name, namespace, body)
-        print("成功更新 ConfigMap!")
-    except Exception as e:
-        print(f"更新 ConfigMap 失败: {e}")
+// Static holds static_configs for a Prometheus job
+type Static struct {
+	Targets []string          `yaml:"targets"`
+	Labels  map[string]string `yaml:"labels,omitempty"`
+}
 
+// PrometheusConfig represents the entire Prometheus configuration
+type PrometheusConfig struct {
+	ScrapeConfigs []JobConfig `yaml:"scrape_configs"`
+}
 
-def fetch_pod_ips(namespace, label_selector):
-    """
-    获取指定 namespace 和 label_selector 的 Pod IP 列表。
-    """
-    config.load_kube_config()
-    v1 = client.CoreV1Api()
-    pod_ips = []
-    try:
-        pods = v1.list_namespaced_pod(namespace=namespace, label_selector=label_selector)
-        for pod in pods.items:
-            if pod.status.pod_ip and pod.status.phase == "Running":
-                pod_ips.append(pod.status.pod_ip)
-    except Exception as e:
-        print(f"获取 Pod 信息失败: {e}")
-    return pod_ips
+// getClientSet initializes a Kubernetes client
+func getClientSet() (*kubernetes.Clientset, error) {
+	// If running inside a cluster, use the in-cluster configuration
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		// Otherwise, use the kubeconfig file from the local filesystem
+		kubeconfig := filepath.Join(homedir.HomeDir(), ".kube", "config")
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load kubeconfig: %v", err)
+		}
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create Kubernetes client: %v", err)
+	}
+	return clientset, nil
+}
 
+// getNamespace retrieves the namespace from an environment variable or falls back to the namespace of the current pod
+func getNamespace() (string, error) {
+	if namespace := os.Getenv("NAMESPACE"); namespace != "" {
+		log.Printf("Environment variable NAMESPACE is set: %s",namespace)
+		return namespace, nil
+	}
+	// Attempt to read the namespace of the current pod
+	namespacePath := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+	data, err := os.ReadFile(namespacePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read namespace file: %v", err)
+	}
+	return string(data), nil
+}
 
-def update_job_targets(config_data, job_name, new_targets):
-    """
-    更新 Prometheus 配置中指定 job_name 的 targets。
-    """
-    config_dict = yaml.safe_load(config_data)
-    updated = False
+// getConfigMap retrieves the specified ConfigMap from the given namespace
+func getConfigMap(clientset *kubernetes.Clientset, namespace, configMapName string) (*v1.ConfigMap, error) {
+	configMap, err := clientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), configMapName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve ConfigMap: %v", err)
+	}
+	return configMap, nil
+}
 
-    for scrape_config in config_dict.get("scrape_configs", []):
-        if scrape_config.get("job_name") == job_name:
-            scrape_config["static_configs"] = [{"targets": new_targets}]
-            updated = True
+// updateConfigMap updates the specified ConfigMap in the given namespace
+func updateConfigMap(clientset *kubernetes.Clientset, namespace, configMapName string, data map[string]string) error {
+	_, err := clientset.CoreV1().ConfigMaps(namespace).Update(context.TODO(), &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configMapName,
+			Namespace: namespace,
+		},
+		Data: data,
+	}, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update ConfigMap: %v", err)
+	}
+	return nil
+}
 
-    if updated:
-        return yaml.dump(config_dict)
-    else:
-        print(f"未找到 job_name: {job_name}")
-        return None
+// getPodIPs retrieves the IPs of running pods matching the specified label selector in the given namespace
+func getPodIPs(clientset *kubernetes.Clientset, namespace, labelSelector string) ([]string, error) {
+	log.Printf("retrieves the IPs of running pods matching the specified label selector %s", labelSelector)
+	pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve pods: %v", err)
+	}
+	var podIPs []string
+	for _, pod := range pods.Items {
+		if pod.Status.PodIP != "" && pod.Status.Phase == v1.PodRunning {
+			podIPs = append(podIPs, pod.Status.PodIP)
+		}
+	}
+	return podIPs, nil
+}
 
+// updateJobTargets updates the targets for a specific job in the Prometheus configuration
+func updateJobTargets(config *PrometheusConfig, jobName string, newTargets []string) bool {
+	for i, job := range config.ScrapeConfigs {
+		if job.JobName == jobName {
+			config.ScrapeConfigs[i].StaticConfig = []Static{
+				{Targets: newTargets},
+			}
+			return true
+		}
+	}
+	return false
+}
 
-def extract_jobs_from_config(config_data):
-    """
-    从 prometheus.yml 配置文件中提取所有的 job 信息。
-    """
-    config_dict = yaml.safe_load(config_data)
-    jobs = []
+func main() {
+	// Configuration
+	configMapName := os.Getenv("CONFIG_MAP_NAME")
+	if configMapName == "" {
+		configMapName = "prometheus-config"
+	}
+	interval := 30 * time.Second
 
-    for scrape_config in config_dict.get("scrape_configs", []):
-        job = {}
-        job["job_name"] = scrape_config.get("job_name")
-        if "static_configs" in scrape_config:
-            for config in scrape_config["static_configs"]:
-                if "targets" in config:
-                    job["targets"] = config["targets"]
-                    # 如果有指定 label_selector，提取出来
-                    if "labels" in config:
-                        job["label_selector"] = config["labels"]
-                    else:
-                        job["label_selector"] = None
-        jobs.append(job)
+	clientset, err := getClientSet()
+	if err != nil {
+		log.Fatalf("Failed to initialize Kubernetes client: %v", err)
+	}
 
-    return jobs
+	namespace, err := getNamespace()
+	if err != nil {
+		log.Fatalf("Failed to determine namespace: %v", err)
+	}
 
+	log.Printf("to retrieve ConfigMap: %s", configMapName)
+	for {
+		// Retrieve the ConfigMap
+		configMap, err := getConfigMap(clientset, namespace, configMapName)
+		if err != nil {
+			log.Printf("Failed to retrieve ConfigMap: %v", err)
+			time.Sleep(interval)
+			continue
+		}
 
-def monitor_and_update(namespace, configmap_name, interval):
-    """
-    监控 Pod IP 并动态更新 Prometheus 的 ConfigMap。
-    """
-    while True:
-        try:
-            # 获取当前 ConfigMap 数据
-            configmap = get_prometheus_configmap(namespace, configmap_name)
-            if not configmap or not configmap.data or "prometheus.yml" not in configmap.data:
-                print("未找到 Prometheus 配置文件")
-                continue
+		// Parse Prometheus configuration
+		prometheusConfig := PrometheusConfig{}
+		err = yaml.Unmarshal([]byte(configMap.Data["prometheus.yml"]), &prometheusConfig)
+		if err != nil {
+			log.Printf("Failed to parse Prometheus configuration: %v", err)
+			time.Sleep(interval)
+			continue
+		}
 
-            # 加载 Prometheus 配置
-            prometheus_config = configmap.data["prometheus.yml"]
+		// Update targets for each job
+		for _, job := range prometheusConfig.ScrapeConfigs {
+			labelSelector := job.StaticConfig[0].Labels["app"]
+			// log.Printf("labelSelector: app=%s",labelSelector)
+			podIPs, err := getPodIPs(clientset, namespace, fmt.Sprintf("app=%s", labelSelector))
+			if err != nil {
+				log.Printf("Failed to retrieve pods: %v", err)
+				continue
+			}
+			newTargets := []string{}
+			for _, ip := range podIPs {
+				newTargets = append(newTargets, fmt.Sprintf("%s:9100", ip))
+			}
+			if updateJobTargets(&prometheusConfig, job.JobName, newTargets) {
+				log.Printf("Updated targets for job [%s] successfully", job.JobName)
+			}
+		}
 
-            # 提取所有的 job 配置信息
-            jobs = extract_jobs_from_config(prometheus_config)
+		// Serialize updated configuration
+		newConfigData, err := yaml.Marshal(&prometheusConfig)
+		if err != nil {
+			log.Printf("Failed to serialize Prometheus configuration: %v", err)
+			time.Sleep(interval)
+			continue
+		}
 
-            for job in jobs:
-                job_name = job['job_name']
-                label_selector = job['label_selector']
-                if label_selector:
-                    # 获取 Pod IP
-                    pod_ips = fetch_pod_ips(namespace, label_selector)
-                    new_targets = [f"{ip}:9100" for ip in pod_ips]  # 默认端口为9100
+		// Update the ConfigMap
+		err = updateConfigMap(clientset, namespace, configMapName, map[string]string{
+			"prometheus.yml": string(newConfigData),
+		})
+		if err != nil {
+			log.Printf("Failed to update ConfigMap: %v", err)
+			time.Sleep(interval)
+			continue
+		}
 
-                    # 更新 Prometheus 配置
-                    updated_config = update_job_targets(prometheus_config, job_name, new_targets)
-                    if updated_config:
-                        configmap.data["prometheus.yml"] = updated_config
-
-            # 更新 ConfigMap
-            update_prometheus_configmap(namespace, configmap_name, configmap.data)
-
-        except Exception as e:
-            print(f"监控和更新任务失败: {e}")
-        time.sleep(interval)
-
-
-if __name__ == "__main__":
-    # 配置参数
-    NAMESPACE = "monitoring"  # Prometheus ConfigMap 所在的命名空间
-    CONFIGMAP_NAME = "prometheus-config"  # Prometheus ConfigMap 名称
-    UPDATE_INTERVAL = 30  # 更新间隔（秒）
-
-    # 启动监控和更新任务
-    monitor_and_update(NAMESPACE, CONFIGMAP_NAME, UPDATE_INTERVAL)
+		log.Println("Successfully updated Prometheus configuration")
+		time.Sleep(interval)
+	}
+}
