@@ -27,7 +27,7 @@ type JobConfig struct {
 
 // Static holds static_configs for a Prometheus job
 type Static struct {
-	Targets []string          `yaml:"targets"`
+	Targets []string          `yaml:"targets,flow"` // Use flow style for single-line output
 	Labels  map[string]string `yaml:"labels,omitempty"`
 }
 
