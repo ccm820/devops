@@ -1,32 +1,35 @@
-# 使用官方 Go 镜像作为基础镜像
+# Stage 1: Build
 FROM golang:1.20 as builder
 
-# 设置工作目录
+# Set the working directory inside the container
 WORKDIR /app
 
-# 将 go.mod 和 go.sum 复制到工作目录
+# Copy go.mod and go.sum for dependency installation
 COPY go.mod go.sum ./
 
-# 下载依赖
+# Download and cache the dependencies
 RUN go mod download
 
-# 复制源代码
+# Copy the source code
 COPY . .
 
-# 构建可执行文件
-RUN go build -o prometheus-updater main.go
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -o prometheus-config-updater
 
-# 使用轻量级镜像运行构建的二进制文件
-FROM alpine:3.17
+# Stage 2: Run
+FROM alpine:latest
 
-# 为 alpine 安装必要的证书
+# Install required packages (optional)
 RUN apk --no-cache add ca-certificates
 
-# 设置工作目录
+# Set the working directory inside the container
 WORKDIR /root/
 
-# 从构建阶段复制二进制文件到运行时镜像
-COPY --from=builder /app/prometheus-updater .
+# Copy the built binary from the builder stage
+COPY --from=builder /app/prometheus-config-updater .
 
-# 启动程序
-CMD ["./prometheus-updater"]
+# Expose a port if required (optional)
+# EXPOSE 8080
+
+# Command to run the binary
+CMD ["./prometheus-config-updater"]
