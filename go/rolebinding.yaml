@@ -1,0 +1,25 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: devops-tools  #  namespace
+  name: configmap-access-role  # role
+rules:
+- apiGroups: [""]
+  resources: ["*"]
+  verbs: ["get", "list", "watch","create", "update", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: configmap-access-binding
+  namespace: devops-tools  # namespace
+subjects:
+- kind: ServiceAccount
+  name: default  # service account
+  namespace: devops-tools  # 
+roleRef:
+  kind: Role
+  name: configmap-access-role  # role
+  apiGroup: rbac.authorization.k8s.io

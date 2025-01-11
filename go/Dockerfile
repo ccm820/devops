@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM golang:1.23 AS builder
+FROM golang:1.20 AS builder
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -17,7 +17,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o prometheus-config-updater
 
 # Stage 2: Run
-FROM alpine:latest
+FROM alpine:3.18
 
 # Install required packages (optional)
 RUN apk --no-cache add ca-certificates

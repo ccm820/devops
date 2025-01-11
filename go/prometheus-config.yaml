@@ -29,6 +29,7 @@ data:
             labels:
               app: jenkins-server
               team: hsbclink
+              monitor: true
       - job_name: 'jenkins-link'
         static_configs:
           - targets: ['10.1.6.238:8090']

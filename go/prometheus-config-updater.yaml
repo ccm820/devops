@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-config-updater
+  labels:
+    app: prometheus-config-updater
+spec:
+  replicas: 1  # 
+  selector:
+    matchLabels:
+      app: prometheus-config-updater
+  template:
+    metadata:
+      labels:
+        app: prometheus-config-updater
+    spec:
+      containers:
+      - name: prometheus-config-updater
+        image: prometheus-config-updater:1.0.1  # 
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace  # 
