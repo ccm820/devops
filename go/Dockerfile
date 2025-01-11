@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM golang:1.20 as builder
+FROM golang:1.23 AS builder
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -23,7 +23,7 @@ FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 
 # Set the working directory inside the container
-WORKDIR /root/
+WORKDIR /app/
 
 # Copy the built binary from the builder stage
 COPY --from=builder /app/prometheus-config-updater .

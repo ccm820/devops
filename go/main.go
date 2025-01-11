@@ -60,7 +60,7 @@ func getNamespace() (string, error) {
 	if namespace := os.Getenv("NAMESPACE"); namespace != "" {
 		log.Printf("Environment variable NAMESPACE is set: %s",namespace)
 		return namespace, nil
-	}
+	} 
 	// Attempt to read the namespace of the current pod
 	namespacePath := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 	data, err := os.ReadFile(namespacePath)
@@ -227,7 +227,7 @@ func main() {
 
 	// Define the required labels for updating a job
 	requiredLabels := map[string]string{
-		"team": "hsbclink", // Replace "example" with your actual label value
+		"monitor": "true", // Replace "example" with your actual label value
 	}
 	
 	for {
@@ -269,6 +269,7 @@ func main() {
 		}
 		if updated_jobs == 0 {
 			log.Println("No jobs met the required label criteria skipping ConfigMap update")
+			time.Sleep(interval)
 			continue
 		} 
 		if !updated {
