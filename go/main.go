@@ -213,6 +213,12 @@ func main() {
 	if configMapName == "" {
 		configMapName = "prometheus-config"
 	}
+
+	configMapDataFile := os.Getenv("CONFIG_MAP_DATA_FILE")
+	if configMapDataFile == "" {
+		configMapDataFile = "prometheus.yml"
+	}
+
 	interval := 30 * time.Second
 
 	clientset, err := getClientSet()
@@ -241,7 +247,8 @@ func main() {
 
 		// Parse Prometheus configuration
 		prometheusConfig := PrometheusConfig{}
-		err = yaml.Unmarshal([]byte(configMap.Data["prometheus.yml"]), &prometheusConfig)
+		
+		err = yaml.Unmarshal([]byte(configMap.Data[configMapDataFile]), &prometheusConfig)
 		if err != nil {
 			log.Printf("Failed to parse Prometheus configuration: %v", err)
 			time.Sleep(interval)
@@ -287,7 +294,7 @@ func main() {
 
 		// Update the ConfigMap
 		err = updateConfigMap(clientset, namespace, configMapName, map[string]string{
-			"prometheus.yml": string(newConfigData),
+			configMapDataFile: string(newConfigData),
 		})
 		if err != nil {
 			log.Printf("Failed to update ConfigMap: %v", err)

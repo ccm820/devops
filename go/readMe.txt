@@ -24,3 +24,5 @@ note: imported by a module that requires go 1.21
 /home/caiman/go/pkg/mod/sigs.k8s.io/json@v0.0.0-20241010143419-9aa6b5e7a4b3/internal/golang/encoding/json/encode.go:21:2: package slices is not in GOROOT (/home/caiman/sdk/go1.20.10/src/slices)
 note: imported by a module that requires go 1.21
 
+
+sidecar.istio.io/extraAnnotation.pod.prometheus.io/scrape="false" 这个注解 不会覆盖 Deployment 中已经设置的 prometheus.io/scrape 注解，因为它仅控制 Istio 侧车代理是否会注入注解，而不是修改 PodTemplate 或 Deployment 中已有的注解。
