@@ -1,0 +1,11 @@
+scrape_configs:
+- job_name: 'kubernetes-services'
+  kubernetes_sd_configs:
+  - role: service
+  relabel_configs:
+  - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_scrape ]
+    regex: true
+    action: keep
+  - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_port ]
+    target_label: __address__
+    replacement: ${1}:${1}
