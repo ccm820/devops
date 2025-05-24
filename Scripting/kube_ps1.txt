@@ -9,6 +9,10 @@ KUBE_PS1_TTL=10  # 缓存刷新间隔（秒）
 KUBE_PS1_ALIAS_ENABLED=true
 KUBE_PS1_ALIAS_FILE="$HOME/.kube/context-alias"  # 格式: context-name=alias
 
+KUBE_PS1_SHOW_CLUSTER=false  # true 显示 cluster endpoint
+KUBE_PS1_COLOR_SCHEME_ENABLED=true
+KUBE_PS1_FORCE_COLOR=true  # 在非交互 shell 强制颜色（如 tmux）
+
 # 生产环境规则：匹配 prod 或 production
 KUBE_PS1_PROD_CONTEXT_REGEX='.*prod.*|.*production.*'
 KUBE_PS1_PROD_ICON='!!'
@@ -59,6 +63,22 @@ _kube_ps1_alias() {
   else
     echo "$ctx"
   fi
+}
+
+# === 是否忽略 ===
+_kube_ps1_ignored() {
+  local ctx="$1"
+  for ignore in "${KUBE_PS1_IGNORE_CONTEXTS[@]}"; do
+    [[ "$ctx" == "$ignore" ]] && return 0
+  done
+  return 1
+}
+
+# === 显示颜色 ===
+_kube_ps1_color_wrap() {
+  local color="$1"
+  local text="$2"
+  [[ "$KUBE_PS1_COLOR_SCHEME_ENABLED" = true ]] && echo "\[${color}\]${text}\[\e[0m\]" || echo "$text"
 }
 
 kube_ps1() {
