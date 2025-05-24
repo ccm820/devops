@@ -1,0 +1,115 @@
+# === 缓存变量 ===
+__KUBE_PS1_LAST_KUBECONFIG=""
+__KUBE_PS1_LAST_HASH=""
+__KUBE_PS1_CACHE_OUTPUT=""
+__KUBE_PS1_LAST_UPDATE=0
+
+# === 可选配置 ===
+KUBE_PS1_TTL=10  # 缓存刷新间隔（秒）
+KUBE_PS1_ALIAS_ENABLED=true
+KUBE_PS1_ALIAS_FILE="$HOME/.kube/context-alias"  # 格式: context-name=alias
+
+# 生产环境规则：匹配 prod 或 production
+KUBE_PS1_PROD_CONTEXT_REGEX='.*prod.*|.*production.*'
+KUBE_PS1_PROD_ICON='!!'
+KUBE_PS1_PROD_COLOR='\e[1;31m'
+
+# 命名空间颜色规则（按优先级匹配）
+declare -A KUBE_PS1_NS_COLOR_RULES=(
+  ["kube-system"]='\e[35m'
+  ["default"]='\e[1;32m'
+  [".*sit.*"]='\e[33m'
+  [".*dev.*"]='\e[36m'
+)
+
+KUBE_PS1_ENABLED=true
+
+kube_ps1_toggle() {
+  if [[ "$KUBE_PS1_ENABLED" == true ]]; then
+    KUBE_PS1_ENABLED=false
+  else
+    KUBE_PS1_ENABLED=true
+  fi
+  kube_ps1_refresh
+}
+
+_kube_ps1_color_ns() {
+  local ns="$1"
+  for pattern in "${!KUBE_PS1_NS_COLOR_RULES[@]}"; do
+    if [[ "$ns" =~ $pattern ]]; then
+      _kube_ps1_color_wrap "${KUBE_PS1_NS_COLOR_RULES[$pattern]}" "$ns"
+      return
+    fi
+  done
+  _kube_ps1_color_wrap "$COLOR_NS" "$ns"
+}
+
+# 强制刷新命令
+kube_ps1_refresh() {
+  __KUBE_PS1_LAST_HASH=""
+  __KUBE_PS1_LAST_UPDATE=0
+}
+
+# 获取别名（如果启用）
+_kube_ps1_alias() {
+  local ctx="$1"
+  if [[ "$KUBE_PS1_ALIAS_ENABLED" = true && -f "$KUBE_PS1_ALIAS_FILE" ]]; then
+    local alias=$(grep "^$ctx=" "$KUBE_PS1_ALIAS_FILE" | cut -d'=' -f2-)
+    echo "${alias:-$ctx}"
+  else
+    echo "$ctx"
+  fi
+}
+
+kube_ps1() {
+  if [[ "$KUBE_PS1_ENABLED" != true ]]; then
+    return
+  fi
+
+  local current_kubeconfig="${KUBECONFIG:-$HOME/.kube/config}"
+  local now=$(date +%s)
+
+  if [[ "$current_kubeconfig" != "$__KUBE_PS1_LAST_KUBECONFIG" ]]; then
+    __KUBE_PS1_LAST_KUBECONFIG="$current_kubeconfig"
+    __KUBE_PS1_LAST_HASH=""
+  fi
+
+  local config_hash=$(cat $(echo "$current_kubeconfig" | tr ':' ' ') 2>/dev/null | sha256sum | cut -d' ' -f1)
+
+  if [[ "$config_hash" != "$__KUBE_PS1_LAST_HASH" || $((now - __KUBE_PS1_LAST_UPDATE)) -ge $KUBE_PS1_TTL ]]; then
+    __KUBE_PS1_LAST_HASH="$config_hash"
+    __KUBE_PS1_LAST_UPDATE="$now"
+
+    local ctx=$(kubectl config current-context 2>/dev/null)
+    if _kube_ps1_ignored "$ctx"; then
+      __KUBE_PS1_CACHE_OUTPUT=""
+      return
+    fi
+
+    local ns=$(kubectl config view --minify --output 'jsonpath={..namespace}' 2>/dev/null)
+    [[ -z "$ns" ]] && ns="default"
+
+    local cluster=""
+    [[ "$KUBE_PS1_SHOW_CLUSTER" = true ]] && cluster=$(kubectl config view -o jsonpath="{.contexts[?(@.name==\"$ctx\")].context.cluster}" 2>/dev/null)
+
+    local ctx_alias=$(_kube_ps1_alias "$ctx")
+
+    local icon="⎈"
+    if [[ "$ctx" =~ $KUBE_PS1_PROD_CONTEXT_REGEX ]]; then
+      icon="$KUBE_PS1_PROD_ICON"
+      COLOR_CTX="$KUBE_PS1_PROD_COLOR"
+    fi
+
+    local output="$icon $(_kube_ps1_color_wrap "$COLOR_CTX" "$ctx_alias")"
+    [[ "$ns" != "default" || -n "$KUBE_PS1_NS_COLOR_RULES" ]] && output="$output/$(_kube_ps1_color_ns "$ns")"
+    [[ -n "$cluster" ]] && output="$output@$(_kube_ps1_color_wrap "$COLOR_CLUSTER" "$cluster")"
+
+    __KUBE_PS1_CACHE_OUTPUT="$output"
+  fi
+
+  echo -e "$__KUBE_PS1_CACHE_OUTPUT"
+}
+
+# source ~/.kube_ps1.sh
+# export PS1='[\u@\h \W $(kube_ps1)]\$ '
+
