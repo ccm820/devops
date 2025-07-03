@@ -1,0 +1,9 @@
+volumeMounts:
+  - name: vault-templates
+    mountPath: /vault/templates
+    readOnly: true
+
+volumes:
+  - name: vault-templates
+    configMap:
+      name: vault-templates

@@ -1,0 +1,6 @@
+{
+  "host": "db.example.com",
+  "port": 5432,
+  "username": "{{ with secret "secret/data/app/db-config" }}{{ .Data.data.username }}{{ end }}",
+  "password": "{{ with secret "secret/data/app/db-config" }}{{ .Data.data.password }}{{ end }}"
+}
